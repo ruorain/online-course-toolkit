@@ -1,9 +1,11 @@
 #include "app.h"
 
 #include <commctrl.h>
+#include <shellapi.h>
 
 #include <algorithm>
 #include <cstdio>
+#include <string>
 #include <atomic>
 #include <string>
 #include <thread>
@@ -227,18 +229,35 @@ void LaunchControlledBrowser() {
         cmd += L" about:blank";
     }
 
+    LogLine("启动浏览器: " + WideToUtf8(cmd));
+
     STARTUPINFOW si{};
     si.cb = sizeof(si);
     PROCESS_INFORMATION pi{};
     std::vector<wchar_t> buf(cmd.begin(), cmd.end());
     buf.push_back(L'\0');
-    if (!::CreateProcessW(nullptr, buf.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si,
-                          &pi)) {
-        ::MessageBoxW(g_bar, L"启动浏览器失败。", L"启动失败", MB_ICONERROR | MB_OK);
+    if (::CreateProcessW(nullptr, buf.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si,
+                         &pi)) {
+        ::CloseHandle(pi.hThread);
+        ::CloseHandle(pi.hProcess);
+        LogLine("浏览器已启动");
         return;
     }
-    ::CloseHandle(pi.hThread);
-    ::CloseHandle(pi.hProcess);
+    DWORD err = ::GetLastError();
+    LogLine("CreateProcess 失败 err=" + std::to_string(err));
+
+    // 兜底：ShellExecute（对 UAC / 路径权限更宽容）
+    std::wstring args = cmd.substr(cmd.find(L' ') + 1);
+    HINSTANCE h = ::ShellExecuteW(nullptr, L"open", exe.c_str(), args.c_str(), nullptr,
+                                  SW_SHOWNORMAL);
+    if (reinterpret_cast<INT_PTR>(h) > 32) {
+        LogLine("ShellExecute 启动成功");
+        return;
+    }
+    std::wstring msg = L"启动浏览器失败（错误代码 " + std::to_wstring(err) +
+                       L"）。\n\n可以在开始菜单里手动打开 Edge，加参数：\n--remote-debugging-port=" +
+                       std::to_wstring(cfg.port);
+    ::MessageBoxW(g_bar, msg.c_str(), L"启动失败", MB_ICONERROR | MB_OK);
 }
 
 void OpenSettings() {

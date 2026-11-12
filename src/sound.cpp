@@ -1,5 +1,7 @@
 #include "app.h"
 
+#include "util.h"
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -9,19 +11,35 @@
 
 #include "app.h"
 
+#include "util.h"
+
 namespace {
 
 std::thread g_thread;
 std::atomic<bool> g_running{false};
 
+bool BeepOnce(int freq, int ms) {
+    if (::Beep(freq, ms)) return true;
+    // 有些机器/独占音频设备上 Beep 会失败，退回系统提示音
+    ::MessageBeep(MB_ICONHAND);
+    ::Sleep(ms);
+    return false;
+}
+
 void Pattern() {
-    ::Beep(1050, 130);
+    static bool logged = false;
+    bool ok = BeepOnce(1050, 130);
+    if (!logged) {
+        logged = true;
+        LogLine(std::string("提示音 Beep ") + (ok ? "正常" : "失败，已退回 MessageBeep") +
+                " err=" + std::to_string(::GetLastError()));
+    }
     ::Sleep(55);
-    ::Beep(1450, 130);
+    BeepOnce(1450, 130);
     ::Sleep(55);
-    ::Beep(1050, 130);
+    BeepOnce(1050, 130);
     ::Sleep(55);
-    ::Beep(1450, 230);
+    BeepOnce(1450, 230);
 }
 
 }  // namespace

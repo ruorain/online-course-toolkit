@@ -299,9 +299,11 @@ void ShowMenu(HWND hWnd, POINT pt) {
 
     RECT rc;
     ::GetWindowRect(hWnd, &rc);
+    ::SetForegroundWindow(hWnd);  // 不先抢前台，菜单会出现但点不动
     UINT flags = TPM_RETURNCMD | TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RIGHTBUTTON;
     int cmd = (int)::TrackPopupMenu(menu, flags, pt.x, rc.bottom + 2, 0, hWnd, nullptr);
     ::DestroyMenu(menu);
+    ::PostMessageW(hWnd, WM_NULL, 0, 0);  // 释放菜单的鼠标捕获
 
     switch (cmd) {
         case IDM_SETTINGS:
@@ -403,7 +405,7 @@ LRESULT CALLBACK BarProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp) {
             }
             RECT rc;
             ::GetWindowRect(hWnd, &rc);
-            g_dragOffset = POINT{p.x + rc.left, p.y + rc.top};
+            g_dragOffset = POINT{p.x, p.y};  // 相对窗口的偏移，不是屏幕坐标
             g_dragging = true;
             ::SetCapture(hWnd);
             return 0;
@@ -590,7 +592,7 @@ bool CreateBarWindow(HINSTANCE inst) {
 
     int x = cfg.barX, y = cfg.barY;
     ClampToScreen(x, y, 420, 40);
-    DWORD exStyle = WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
+    DWORD exStyle = WS_EX_TOPMOST | WS_EX_TOOLWINDOW;
     if (cfg.alpha < 100) exStyle |= WS_EX_LAYERED;
     g_bar = ::CreateWindowExW(exStyle, kBarClass, L"视频播放监控", WS_POPUP, x, y, 400, 36,
                               nullptr, nullptr, inst, nullptr);
