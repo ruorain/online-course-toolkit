@@ -1,0 +1,14 @@
+# 构建产物
+*.exe
+*.o
+*.obj
+build/
+
+# 本机配置与日志（不进仓库）
+config.ini
+error.log
+*.log
+
+# 编辑器
+.vscode/
+*.swp

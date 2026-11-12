@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>视频播放监控条 · 使用说明</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; min-height: 100vh; background: #14161c; color: #e8ebf2;
+         font: 15px/1.75 "Microsoft YaHei UI", "Segoe UI", sans-serif; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 48px 24px 64px; }
+  h1 { font-size: 24px; margin: 0 0 6px; }
+  .sub { color: #98a0b3; margin: 0 0 28px; }
+  ol { padding-left: 22px; margin: 0 0 26px; }
+  li { margin: 10px 0; }
+  b { color: #ffd166; font-weight: 600; }
+  .card { background: #1b1e26; border: 1px solid #2b3040; border-radius: 14px;
+          padding: 20px 22px; margin: 18px 0; }
+  .card h2 { font-size: 16px; margin: 0 0 10px; color: #2ee59d; }
+  .tip { color: #98a0b3; font-size: 13px; }
+  .badge { display: inline-block; font-size: 12px; background: #ff2d55; color: #fff;
+           border-radius: 6px; padding: 1px 7px; margin-right: 4px; }
+  .bar { font-family: Consolas, monospace; background: #1b1d23; border: 1px solid #3b4150;
+         border-radius: 8px; padding: 10px 14px; margin: 10px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>视频播放监控条</h1>
+  <p class="sub">这条状态栏会一直浮在所有窗口上面，告诉你两个窗口里的视频是否还在播放。</p>
+
+  <div class="card">
+    <h2>① 在这个浏览器里打开两个窗口</h2>
+    <p>本窗口是「受控浏览器」——只有它里面的播放状态才能被读取。
+       两个窗口各放一个视频（网课、直播、监控画面都行）。</p>
+    <p class="tip">学习通、智慧树这类把播放器放在 iframe 里的网站也能识别。</p>
+    <p class="tip">登录一次会被记住，下次不用重新登录。</p>
+  </div>
+
+  <div class="card">
+    <h2>② 右键状态条 → 选择要监控的两个窗口</h2>
+    <ol>
+      <li>右键顶部那条黑底状态栏，选 <b>① 选择要监控的两个窗口…</b></li>
+      <li>点 <b>自动指定</b>：程序会自己找到两个带视频的页面并填好</li>
+      <li>也可以手动：选中一行 → <b>设为视频1</b>，再选另一行 → <b>设为视频2</b></li>
+    </ol>
+    <p class="tip">绑定记的是标签页本身，换章节导致网址变了也不会掉。</p>
+  </div>
+
+  <div class="card">
+    <h2>③ 停止播放时</h2>
+    <div class="bar">● 视频1 播放中 12:34&nbsp;&nbsp;│&nbsp;&nbsp;<span style="color:#ff5d5d">▲ 视频2 已停止 8s</span>&nbsp;&nbsp;[我知道了]</div>
+    <p>文字会 <span class="badge">红黄闪烁</span> 并<b>发出提示音</b>（每隔几秒叫一次）。
+       暂停、播完、卡住不动、浏览器关掉，都会被判定为「停止」。</p>
+    <p>点状态条上的 <b>我知道了</b> 可以立刻停止闪烁和响铃，文字留着并标上「已静音」；
+       等视频恢复播放后自动重新武装，下次再停会重新提醒。</p>
+  </div>
+
+  <p class="tip">拖动条身可以换位置（拖动时不会闪）。右键菜单里还有：提示音开关 / 始终置顶 / 试听 / 退出。</p>
+</div>
+</body>
+</html>
