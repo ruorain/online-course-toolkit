@@ -76,6 +76,19 @@ rem 想看到控制台输出
 py -3 main.py --debug
 ```
 
+### 不想装 Python？
+
+用 PyInstaller 打一个免安装的单文件 exe（约 10 MB，目标机器不需要 Python）：
+
+```bat
+build_exe.bat
+```
+
+产物 `dist\TopVideoMonitor.exe`，拷到任何 Win10/11 机器上双击即可。
+
+> 注意：onefile 首次启动会解包到 `%TEMP%`，大约多花 1~2 秒；
+> 如果系统 `%TEMP%` 不可写（某些受限环境），会提示 "Could not create temporary directory"。
+
 ## 命令行
 
 ```bat

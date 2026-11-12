@@ -31,12 +31,30 @@ import frames
 from frames import PROBE_JS, FrameProber
 
 APP_NAME = "TopVideoMonitor"
-APP_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def _app_dir() -> str:
+    """单文件 exe（PyInstaller）里 __file__ 指向临时解包目录，得用 exe 所在目录。"""
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(os.path.abspath(sys.executable))
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+APP_DIR = _app_dir()
+BUNDLE_DIR = getattr(sys, "_MEIPASS", APP_DIR)  # onefile 解包目录
 DATA_DIR = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), APP_NAME)
 CONFIG_PATH = os.path.join(DATA_DIR, "config.json")
 LOG_PATH = os.path.join(DATA_DIR, "error.log")
-START_PAGE = os.path.join(APP_DIR, "测试页面.html")
-HELP_PAGE = os.path.join(APP_DIR, "使用说明.html")
+def _resource(name: str) -> str:
+    for base in (APP_DIR, BUNDLE_DIR):
+        path = os.path.join(base, name)
+        if os.path.isfile(path):
+            return path
+    return os.path.join(APP_DIR, name)
+
+
+START_PAGE = _resource("测试页面.html")
+HELP_PAGE = _resource("使用说明.html")
 
 # ---------------------------------------------------------------- 配色 / 常量
 BG = "#1b1d23"
@@ -588,6 +606,9 @@ class App:
         self.root.after(150, self._tick)
         self.root.after(400, self._flash_tick)
 
+    CLOSE_FG = "#8a90a0"
+    CLOSE_FG_HOT = "#ff5d5d"
+
     # -- 界面 ------------------------------------------------------------- #
     def _font(self, size_px=None, bold=True) -> tuple:
         px = int(round((size_px or self.cfg.get("font_px", 15)) * self.scale))
@@ -656,6 +677,20 @@ class App:
         )
         self.set_btn.bind("<Button-1>", lambda e: self.open_settings())
         self.set_btn.bind("<Button-3>", self._popup_menu)
+
+        # 常驻关闭按钮：一直在最右边，点一下就退出
+        self.close_btn = tk.Label(
+            self.inner, text="×", bg=BG, fg=self.CLOSE_FG,
+            font=self._font(), padx=int(7 * self.scale), pady=int(2 * self.scale),
+            cursor="hand2",
+        )
+        self.close_btn.pack(side="right", fill="y")
+        self.close_btn.bind("<Button-1>", lambda e: self.quit())
+        self.close_btn.bind("<Button-3>", self._popup_menu)
+        self.close_btn.bind("<Enter>", lambda e: self.close_btn.configure(
+            fg=self.CLOSE_FG_HOT, bg="#3a1d22"))
+        self.close_btn.bind("<Leave>", lambda e: self.close_btn.configure(
+            fg=self.CLOSE_FG, bg=BG))
 
         self._menu = tk.Menu(self.root, tearoff=0,
                              font=("Microsoft YaHei UI", -int(10 * self.scale)))
@@ -946,7 +981,7 @@ class App:
         self.save_config()
 
     def apply_settings(self):
-        for w in self.labels + [self.ack_btn, self.set_btn]:
+        for w in self.labels + [self.ack_btn, self.set_btn, self.close_btn]:
             w.configure(font=self._font())
         for s in self.seps:
             s.configure(font=("Microsoft YaHei UI", -int(13 * self.scale)))
@@ -1251,12 +1286,15 @@ class SettingsWindow:
                                  winreg.KEY_SET_VALUE)
             try:
                 if on:
-                    exe = sys.executable
-                    pyw = os.path.join(os.path.dirname(exe), "pythonw.exe")
-                    if os.path.isfile(pyw):
-                        exe = pyw
-                    winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ,
-                                      '"%s" "%s"' % (exe, os.path.join(APP_DIR, "main.py")))
+                    if getattr(sys, "frozen", False):
+                        cmdline = '"%s"' % os.path.abspath(sys.executable)
+                    else:
+                        exe = sys.executable
+                        pyw = os.path.join(os.path.dirname(exe), "pythonw.exe")
+                        if os.path.isfile(pyw):
+                            exe = pyw
+                        cmdline = '"%s" "%s"' % (exe, os.path.join(APP_DIR, "main.py"))
+                    winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, cmdline)
                 else:
                     try:
                         winreg.DeleteValue(key, APP_NAME)

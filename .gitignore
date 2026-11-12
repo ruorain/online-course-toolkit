@@ -10,3 +10,8 @@ error.log
 
 # 编辑器
 .vscode/
+
+# PyInstaller 产物
+dist/
+build/
+*.spec
