@@ -1,14 +1,12 @@
-# 构建产物
-*.exe
-*.o
-*.obj
-build/
+# Python 缓存
+__pycache__/
+*.pyc
 
-# 本机配置与日志（不进仓库）
+# 本机配置与日志
 config.ini
+config.json
 error.log
 *.log
 
 # 编辑器
 .vscode/
-*.swp

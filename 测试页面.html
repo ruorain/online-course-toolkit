@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>测试视频 · 播放监控</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; min-height: 100vh; display: flex; flex-direction: column;
+         align-items: center; justify-content: center; gap: 18px;
+         background: #14161c; color: #e8ebf2;
+         font: 15px/1.6 "Microsoft YaHei UI", "Segoe UI", sans-serif; }
+  h1 { font-size: 20px; margin: 0; font-weight: 600; }
+  .hint { color: #98a0b3; font-size: 13px; max-width: 680px; text-align: center; }
+  video { width: min(640px, 86vw); border-radius: 12px; background: #000;
+          box-shadow: 0 12px 40px rgba(0,0,0,.55); }
+  .stage { position: relative; display: inline-block; }
+  .playmask { position: absolute; inset: 0; display: none; align-items: center;
+              justify-content: center; border-radius: 12px; cursor: pointer;
+              background: rgba(8,10,14,.55); }
+  .playmask.show { display: flex; }
+  .playmask span { font-size: 17px; background: #ffd166; color: #14161c;
+                   padding: 10px 22px; border-radius: 10px; font-weight: 700; }
+  .row { display: flex; gap: 12px; align-items: center; }
+  button { font: inherit; padding: 8px 18px; border-radius: 8px; border: 1px solid #39415a;
+           background: #232838; color: #e8ebf2; cursor: pointer; }
+  button:hover { background: #2c3346; }
+  #state { color: #2ee59d; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<h1>测试视频</h1>
+<p class="hint">
+  这是给「视频播放监控条」做验证用的页面。视频由本页浏览器端合成（不需要联网、不需要视频文件）。<br>
+  把这个页面开成两个窗口，在监控条里分别指定为「视频1」「视频2」，然后暂停其中一个试试。
+</p>
+<div class="stage">
+  <video id="v" muted playsinline loop></video>
+  <div class="playmask" id="mask"><span>▶ 点这里播放</span></div>
+</div>
+<div class="row">
+  <button id="toggle">暂停</button>
+  <span id="state">准备中…</span>
+</div>
+
+<script>
+(function () {
+  const canvas = document.createElement('canvas');
+  canvas.width = 640;
+  canvas.height = 360;
+  const ctx = canvas.getContext('2d');
+  const video = document.getElementById('v');
+  const toggle = document.getElementById('toggle');
+  const stateEl = document.getElementById('state');
+  const mask = document.getElementById('mask');
+  const t0 = performance.now();
+
+  function draw() {
+    const t = (performance.now() - t0) / 1000;
+    const g = ctx.createLinearGradient(0, 0, 640, 360);
+    g.addColorStop(0, '#101528');
+    g.addColorStop(1, '#1d3b4a');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 640, 360);
+    // 滚动的方块：肉眼一看就知道画面在动
+    for (let i = 0; i < 7; i++) {
+      const x = ((t * 90 + i * 95) % 760) - 60;
+      ctx.fillStyle = 'hsl(' + ((i * 48 + t * 40) % 360) + ', 85%, 62%)';
+      ctx.fillRect(x, 40 + i * 40, 46, 46);
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 54px "Microsoft YaHei UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(t.toFixed(1) + ' s', 320, 210);
+    ctx.font = '20px "Microsoft YaHei UI", sans-serif';
+    ctx.fillStyle = '#b9c4dc';
+    ctx.fillText('测试画面 · 时间是会走的', 320, 258);
+  }
+
+  // 用定时器画，不用 requestAnimationFrame：
+  // 窗口被挡住/最小化时 rAF 会停，canvas 不产帧，录出来就是空视频
+  let track = null;
+  setInterval(() => {
+    draw();
+    if (track && track.requestFrame) { try { track.requestFrame(); } catch (e) {} }
+  }, 33);
+  draw();
+
+  const chunks = [];
+  let rec = null;
+  let retried = false;
+  function startRecording() {
+    let mime = 'video/webm;codecs=vp8';
+    if (typeof MediaRecorder === 'undefined' ||
+        !MediaRecorder.isTypeSupported(mime)) {
+      stateEl.textContent = '当前浏览器不支持 MediaRecorder，无法生成测试视频';
+      return;
+    }
+    const stream = canvas.captureStream(30);
+    track = stream.getVideoTracks()[0] || null;
+    rec = new MediaRecorder(stream, { mimeType: mime });
+    rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    rec.onstop = () => {
+      const blob = new Blob(chunks, { type: 'video/webm' });
+      if (blob.size < 2000 && !retried) {
+        // 录出来是空的（页面当时被挡住/没产帧），重录一次
+        retried = true;
+        chunks.length = 0;
+        stateEl.textContent = '录制结果为空，正在重录…';
+        setTimeout(startRecording, 300);
+        return;
+      }
+      video.src = URL.createObjectURL(blob);
+      video.load();
+      tryPlay();
+      stateEl.textContent = '录制完成，正在循环播放';
+    };
+    rec.start();
+    stateEl.textContent = '正在录制 3 秒测试视频…';
+    setTimeout(() => { if (rec && rec.state !== 'inactive') rec.stop(); }, 3000);
+  }
+
+  function tryPlay() {
+    const p = video.play();
+    if (p && p.catch) {
+      p.then(() => { mask.classList.remove('show'); })
+       .catch(() => { mask.classList.add('show'); stateEl.textContent = '自动播放被拦截，点画面或按钮开始'; });
+    }
+  }
+
+  mask.addEventListener('click', () => {
+    mask.classList.remove('show');
+    tryPlay();
+  });
+  video.addEventListener('playing', () => mask.classList.remove('show'));
+
+  startRecording();
+
+  toggle.addEventListener('click', () => {
+    if (video.paused) {
+      tryPlay();
+    } else {
+      video.pause();
+    }
+  });
+
+  setInterval(() => {
+    const playing = !video.paused && !video.ended;
+    toggle.textContent = playing ? '暂停' : '播放';
+    stateEl.textContent = playing
+      ? '播放中 ' + video.currentTime.toFixed(1) + ' s'
+      : '已暂停 ' + video.currentTime.toFixed(1) + ' s';
+  }, 200);
+})();
+</script>
+</body>
+</html>
