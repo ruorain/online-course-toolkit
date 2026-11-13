@@ -76,19 +76,19 @@ rem 想看到控制台输出
 py -3 main.py --debug
 ```
 
-> **直接下载**：[Releases · v1.0.0](https://github.com/ruorain/top-video-monitor/releases/latest) 里的 `TopVideoMonitor.exe`（10.6 MB，免安装）。
+> **直接下载**：[Releases · v1.0.1](https://github.com/ruorain/top-video-monitor/releases/latest) 里的 `TopVideoMonitor-1.0.1-win64.zip`（10.8 MB，解压即用，目标机不需要 Python）。
 ### 不想装 Python？
 
-用 PyInstaller 打一个免安装的单文件 exe（约 10 MB，目标机器不需要 Python）：
+用 PyInstaller 打成免安装包（**onedir**，目标机器不需要 Python）：
 
 ```bat
 build_exe.bat
 ```
 
-产物 `dist\TopVideoMonitor.exe`，拷到任何 Win10/11 机器上双击即可。
+产物在 `dist\视频监控条\`，整个文件夹拷到任何 Win10/11 机器上，双击 `视频监控条.exe` 即可。
 
-> 注意：onefile 首次启动会解包到 `%TEMP%`，大约多花 1~2 秒；
-> 如果系统 `%TEMP%` 不可写（某些受限环境），会提示 "Could not create temporary directory"。
+> 为什么不用 onefile：onefile 启动时要把自身解包到 `%TEMP%`，在部分机器上会报
+> `Could not create temporary directory!` 直接打不开；onedir 不解包、不碰 `%TEMP%`，启动也更快。
 
 ## 命令行
 
