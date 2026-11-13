@@ -129,6 +129,16 @@ def atomic_write_json(path: str, data) -> None:
     os.replace(tmp, path)
 
 
+def log_note(msg: str) -> None:
+    """往 error.log 追加一行（排查启动类问题用）。"""
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        with open(LOG_PATH, "a", encoding="utf-8") as f:
+            f.write("[%s] %s\n" % (time.strftime("%Y-%m-%d %H:%M:%S"), msg))
+    except Exception:
+        pass
+
+
 def log_exception(where: str):
     try:
         os.makedirs(DATA_DIR, exist_ok=True)
@@ -994,6 +1004,7 @@ class App:
 
     # -- 浏览器 ----------------------------------------------------------- #
     def launch_browser(self):
+        log_note("launch_browser 开始")
         exe = self.cfg.get("browser_exe") or find_browser()
         if not exe or not os.path.isfile(exe):
             messagebox.showerror("找不到浏览器", "没有找到 Edge 或 Chrome。\n请在设置里手动指定浏览器程序。")
@@ -1018,11 +1029,62 @@ class App:
             "--disable-features=msEdgeSidebarV2",
             start_url or "about:blank",
         ]
+        # 用 ShellExecute 而不是 CreateProcess：
+        # 打包成 GUI exe 后没有控制台，CreateProcess 继承的 std 句柄是无效的，
+        # Edge 会启动后立刻退出；ShellExecute 走的是资源管理器那条路径，稳定。
+        params = subprocess.list2cmdline(args[1:])
         try:
-            subprocess.Popen(args, close_fds=True)
+            import ctypes
+            # 必须显式声明 argtypes：否则 ctypes 会把 Python str 当 char* 传，
+            # 指针被截断，轻则调用失败，重则整个进程直接崩掉（没有任何日志）。
+            shell32 = ctypes.WinDLL("shell32", use_last_error=True)
+            shell32.ShellExecuteW.argtypes = [
+                ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_wchar_p,
+                ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_int,
+            ]
+            shell32.ShellExecuteW.restype = ctypes.c_void_p
+            rc = shell32.ShellExecuteW(None, "open", exe, params, None, 1) or 0
+            log_note("ShellExecute rc=%s exe=%s" % (rc, exe))
+            if rc <= 32:
+                raise OSError("ShellExecute 返回 %d" % rc)
+            # 后台确认端口真的起来了，起不来就明确告诉用户怎么办
+            threading.Thread(target=self._verify_browser_started, daemon=True).start()
         except Exception as exc:
-            messagebox.showerror("启动失败", "无法启动浏览器：\n%s" % exc)
+            log_exception("launch_browser")
+            try:
+                subprocess.Popen(
+                    args,
+                    close_fds=True,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            except Exception as exc2:
+                messagebox.showerror("启动失败", "无法启动浏览器：\n%s\n%s" % (exc, exc2))
         self.save_config()
+
+    def _verify_browser_started(self):
+        """启动浏览器后盯 20 秒端口；没起来就提示用兜底 bat。"""
+        port = int(self.cfg.get("port", 9222))
+        for _ in range(40):
+            time.sleep(0.5)
+            try:
+                cdp.browser_version(port, 0.6)
+                log_note("受控浏览器就绪（端口 %d）" % port)
+                return
+            except Exception:
+                continue
+        log_note("受控浏览器 20 秒未就绪")
+        try:
+            messagebox.showwarning(
+                "受控浏览器没起来",
+                "已尝试启动浏览器，但 20 秒内没连上调试端口。\n\n"
+                "请直接双击程序目录里的「启动受控浏览器.bat」，\n"
+                "它会用同样的参数启动 Edge；之后再点「重新连接」。\n\n"
+                "详细原因见 %s" % LOG_PATH,
+            )
+        except Exception:
+            pass
 
     def focus_page(self, target_id: str):
         if not target_id:

@@ -76,7 +76,7 @@ rem 想看到控制台输出
 py -3 main.py --debug
 ```
 
-> **直接下载**：[Releases · v1.0.1](https://github.com/ruorain/top-video-monitor/releases/latest) 里的 `TopVideoMonitor-1.0.1-win64.zip`（10.8 MB，解压即用，目标机不需要 Python）。
+> **直接下载**：[Releases · v1.0.2](https://github.com/ruorain/top-video-monitor/releases/latest) 里的 `TopVideoMonitor-1.0.2-win64.zip`（10.8 MB，解压即用，目标机不需要 Python）。
 ### 不想装 Python？
 
 用 PyInstaller 打成免安装包（**onedir**，目标机器不需要 Python）：
