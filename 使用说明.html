@@ -74,12 +74,32 @@
   </div>
 
   <div class="card ai">
-    <h2>⑤ 不会弄？把这句话发给你在用的 AI 助手</h2>
-    <p>下面这段话可以整段复制，发给 DeepSeek / 豆包 / 通义 / ChatGPT 都行，让 AI 一步步教你或直接帮你操作。</p>
-    <div class="prompt" id="promptHelp">我在 Windows 上用「网课解决方案」这个工具（置顶视频播放监控条 + 学习通用的「不暂停」扩展）。
-现在遇到问题：[把你的问题写在这里，比如"状态条显示未连接" / "扩展不知道怎么装" / "提示音没有声音"]。
-请一步一步教我怎么解决，命令用 PowerShell，路径用 Windows 格式；不确定的地方先问我，不要让我执行看不懂的命令。</div>
-    <button onclick="copyText('promptHelp', this)">复制这段话</button>
+    <h2>⑤ 不会装？把这段发给你的 AI 助手</h2>
+    <p>下面是一整段<strong>安装提示词</strong>，整段复制，发给 DeepSeek / 豆包 / 通义 / ChatGPT 都行，
+       它会一步步带你装好（连扩展一起）。</p>
+    <div class="prompt" id="promptHelp">帮我在这台 Windows 电脑上装一个网课辅助工具，我不太懂电脑，请你一步步带我装好。
+
+项目：https://github.com/ruorain/online-course-toolkit/
+它已经打包成 exe，不需要装 Python 或任何运行库，请不要让我去配环境。
+
+请按顺序来，每一步告诉我具体点哪里，做完一步再下一步：
+1. 从 Release 页下载最新的 TopVideoMonitor-*-win64.zip（约 11 MB），解压到 D:\Tools\视频监控条
+   （没有 D 盘就换别的盘，别放桌面）。解压出来的 _internal 文件夹必须和 exe 放在一起，不能只把 exe 拖出来。
+2. 双击 视频监控条.exe。如果弹出「Windows 已保护你的电脑」，点「更多信息 → 仍要运行」。
+3. 屏幕上方会出现一条黑色状态条：右键它 →「① 选择要监控的两个窗口…」→ 点「启动受控浏览器」。
+   这个浏览器第一次启动要 20 秒左右才开好调试端口，等它起来再点「重新扫描」，不是卡死。
+4. 我在这个受控浏览器里自己登录学习通（密码、验证码我自己输），登好并打开课程视频后你再继续。
+5. 回到设置窗口点「自动指定」，把两个视频窗口绑上；只有一个视频窗口就教我怎么手动「设为视频1 / 设为视频2」。
+6. 装扩展（防止鼠标一移开视频就暂停，只对学习通生效）：把项目里的 extension/nopause-edge 文件夹保存到
+   一个以后不会移动的位置，Edge 地址栏打开 edge://extensions/ → 打开「开发人员模式」→
+   「加载解压缩的扩展」→ 选中 nopause-edge 文件夹本身。
+7. 最后带我验证：把学习通视频暂停，看状态条会不会红黄闪烁并响；播到 90% 时看会不会提醒。
+
+注意：密码、验证码、短信验证我自己输入，你不要代填也不要保存；删文件、改注册表、改系统设置之前先问我，
+等我同意再做；报错先看 %APPDATA%\TopVideoMonitor\error.log，把关键几行翻译成大白话再告诉我。</div>
+    <button onclick="copyText('promptHelp', this)">复制这段安装提示词</button>
+    <p class="tip">已经装好、只是某个地方卡住了？那就直接把现象告诉 AI，比如
+       「状态条显示未连接」「提示音没声音」，它会带你看 <code>%APPDATA%\TopVideoMonitor\error.log</code>。</p>
   </div>
 
   <div class="card ai">
