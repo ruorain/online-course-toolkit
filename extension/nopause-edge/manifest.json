@@ -1,0 +1,52 @@
+{
+  "manifest_version": 3,
+  "name": "不暂停 · 移开鼠标照样播",
+  "version": "1.0.0",
+  "description": "一键干掉「鼠标移开 / 窗口失焦就暂停视频」的事件，万一还是被暂停会立刻自动续播。",
+  "minimum_chrome_version": "111",
+  "permissions": ["storage"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "action": {
+    "default_title": "不暂停（Alt+Shift+X 快速开关本站）",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/guard.js"],
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_about_blank": true,
+      "world": "MAIN"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/bridge.js"],
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_about_blank": true,
+      "world": "ISOLATED"
+    }
+  ],
+  "commands": {
+    "toggle-site": {
+      "suggested_key": { "default": "Alt+Shift+X" },
+      "description": "在当前网站开启 / 关闭「不暂停」"
+    }
+  }
+}

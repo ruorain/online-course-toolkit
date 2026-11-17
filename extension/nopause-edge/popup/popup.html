@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>不暂停</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="head">
+      <img class="logo" src="../icons/icon48.png" alt="" />
+      <div class="headText">
+        <div class="name">不暂停</div>
+        <div class="tagline">移开鼠标 · 切窗口 · 都不打断播放</div>
+      </div>
+    </header>
+
+    <section class="master" id="masterCard">
+      <div class="masterText">
+        <div class="masterTitle" id="masterTitle">当前网站</div>
+        <div class="masterHint" id="masterHint">读取中…</div>
+      </div>
+      <label class="sw big">
+        <input type="checkbox" id="siteOn" aria-label="在当前网站开启不暂停" />
+        <span class="track"></span>
+      </label>
+    </section>
+
+    <div class="siteRow">
+      <span class="dot" id="siteDot"></span>
+      <span class="origin" id="siteOrigin">—</span>
+    </div>
+
+    <section class="opts">
+      <label class="opt">
+        <input type="checkbox" id="autoResume" />
+        <span class="optBox"></span>
+        <span class="optText">
+          <span class="optName">自动续播兜底</span>
+          <span class="optHint">万一还是被暂停，立刻接着播</span>
+        </span>
+      </label>
+      <label class="opt">
+        <input type="checkbox" id="blockFocusLoss" />
+        <span class="optBox"></span>
+        <span class="optText">
+          <span class="optName">切窗口 / 切标签也不暂停</span>
+          <span class="optHint">alt+tab、最小化、切到别的标签都算</span>
+        </span>
+      </label>
+    </section>
+
+    <p class="warn" id="warn" hidden></p>
+
+    <footer class="foot">
+      <span class="stat" id="stat">—</span>
+      <span class="kbd">Alt+Shift+X</span>
+    </footer>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
