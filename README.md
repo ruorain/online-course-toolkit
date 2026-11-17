@@ -10,9 +10,22 @@
 
 两套东西互相独立，可以只装一个，也可以一起用。
 
+> 🧭 **不想看文档？把下面这句发给你在用的 AI 助手**（DeepSeek / 豆包 / 通义 / ChatGPT 都行），让它照着帮你装：
+>
+> ```text
+> 帮我在这台 Windows 电脑上装好「网课解决方案」（github.com/ruorain/online-course-toolkit）：
+> 1. 下载最新的 TopVideoMonitor 的 zip，解压到 D:\Tools\视频监控条（保留 _internal 文件夹）；
+> 2. 启动后右键状态条 → 选择要监控的两个窗口 → 启动受控浏览器，等 20 秒后点「重新扫描」；
+> 3. 把「不暂停 · 学习通专用」扩展加载到 Edge（edge://extensions 开发者模式 → 加载解压缩的扩展）。
+> 每一步做什么、点哪里都告诉我，遇到报错先读 %APPDATA%\TopVideoMonitor\error.log。
+> ```
+>
+> 卸载同样可以甩给 AI，提示词在[第七节](#七卸载--换电脑)；代装/排障细节在[第八节](#八给-ai-助手的话代装--排障指南)。
+
 > ⚠️ **个人学习辅助工具**：只做「提醒」和「防误暂停」——不代刷课、不伪造进度、不修改任何平台数据。
 > 能不能用请先确认你所在学校 / 平台的规定，后果自负。详见 [免责声明](#六免责声明)。
 > 另外：只能配 Edge / Chrome，Firefox、Safari 用不了，原因写在 [第五节](#五为什么只能用-edge--chrome)。
+
 
 ```
 ● 视频1 播放中 12:34   │   ▲ 视频2 已停止 8s   [我知道了]
@@ -383,19 +396,110 @@ Safari 要另外打包成 Xcode 工程——这两条都没有做。
 
 ---
 
-# 七、卸载
+# 七、卸载 / 换电脑
 
-1. 右键状态条 → 退出（或点最右边的 ×）。
-2. 删除程序目录（含 `_internal`）。
-3. 删除 `%APPDATA%\TopVideoMonitor\`（配置 + 日志）和
-   `%LOCALAPPDATA%\TopVideoMonitor\`（受控浏览器的独立配置目录，含登录状态）。
-4. 扩展：`edge://extensions/` → 找到「不暂停 · 学习通专用」→ 移除，然后删掉它的文件夹。
-5. 如果开过「随 Windows 启动」，在设置里取消勾选，或删掉注册表
-   `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\TopVideoMonitor`。
+## 最简单的办法：交给 AI 助手
+
+不用记路径、不用动注册表。**把你在用的 AI 助手（DeepSeek / 豆包 / 通义 / ChatGPT 都行）打开，把下面这段整段贴进去**，
+它就会带着你做，或者直接替你做完：
+
+```text
+帮我彻底卸载 Windows 上的「网课解决方案」这个工具，它包含一个「视频监控条」程序和一个 Edge 扩展。
+请帮我做这几件事，做完逐条告诉我结果：
+1. 关掉正在运行的「视频监控条」（可以在任务管理器里结束进程）；
+2. 删掉程序所在文件夹（如果你不确定在哪，先搜索「视频监控条.exe」）；
+3. 删掉这两个数据目录：%APPDATA%\TopVideoMonitor 和 %LOCALAPPDATA%\TopVideoMonitor；
+4. 在 Edge 里打开 edge://extensions/，移除「不暂停 · 学习通专用」这个扩展，再删掉它的文件夹；
+5. 检查开机自启（HKCU\Software\Microsoft\Windows\CurrentVersion\Run）里有没有 TopVideoMonitor，有就删掉；
+6. 最后告诉我还有没有残留，以及怎么确认已经清干净。
+```
+
+不想麻烦 AI？自己三步也够了：
+
+1. **关掉程序**：右键状态条 → 退出（或者点最右边的 ×）。
+2. **删掉文件夹**：把「视频监控条」那个文件夹整个删掉（里面有 `_internal`，一起删）。
+3. **删掉两个数据目录**：地址栏输入 `%APPDATA%` 回车 → 删掉 `TopVideoMonitor`；
+   再输入 `%LOCALAPPDATA%` 回车 → 也删掉 `TopVideoMonitor`。
+
+装过扩展的话多一步：Edge 地址栏 `edge://extensions/` → 找到「不暂停 · 学习通专用」→ 点「移除」，
+然后把它对应的文件夹删掉。
+
+<details>
+<summary>给 AI 助手看的完整清单（普通人可以跳过）</summary>
+
+| 项目 | 位置 / 操作 |
+|---|---|
+| 进程 | `视频监控条.exe`（PyInstaller 版）或 `pythonw.exe main.py`（源码版） |
+| 程序目录 | 桌面「视频监控条」文件夹，含 `_internal\`、`使用说明.html`、`config.ini`、`error.log` |
+| 配置 / 日志 | `%APPDATA%\TopVideoMonitor\`（`config.json` 或 `config.ini`、`error.log`） |
+| 受控浏览器 | `%LOCALAPPDATA%\TopVideoMonitor\browser-profile\`（独立 Edge 配置，含登录状态） |
+| 开机自启 | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` → 值名 `TopVideoMonitor` |
+| 扩展 | `edge://extensions/` 移除后，删除被「加载解压缩的扩展」选中的那个文件夹 |
+| 确认干净 | 两个 `TopVideoMonitor` 目录都不存在；任务管理器里没有 `视频监控条.exe` |
+
+</details>
 
 ---
 
-# 八、许可
+# 八、给 AI 助手的话（代装 / 排障指南）
+
+> 这一节是写给**会读文档的 AI 助手**的。这个项目很多用户不是程序员，遇到问题会把这段话发给 AI。
+> 如果你正在帮人装这个工具，请按下面来，别只丢一个链接。
+
+## 8.1 一句话背景
+
+两件东西：**置顶播放监控条**（Python / 打包 exe，用 CDP 读播放进度）和 **「不暂停」Edge 扩展**
+（只注入 `*.chaoxing.com`，拦掉「移开鼠标就暂停」）。两者独立，可只装一个。
+
+## 8.2 代装步骤（Windows）
+
+1. **确认浏览器**：必须是 Edge 或 Chrome（Chromium 内核）。Firefox / Safari 用不了，原因见[第五节](#五为什么只能用-edge--chrome)。
+2. **装监控条**：从 [Releases](https://github.com/ruorain/online-course-toolkit/releases/latest) 下
+   `TopVideoMonitor-2.0.1-win64.zip`，解压到**一个不会被移动的目录**（例如 `D:\Tools\视频监控条`），
+   双击 `视频监控条.exe`。**必须保留 `_internal` 文件夹**，不能只拷 exe。
+3. **确认它在跑**：屏幕上方出现一条黑底状态条（`… 视频1 未指定  … 视频2 未指定  ⚙ 选择窗口`）。
+4. **开受控浏览器**：右键状态条 → ① 选择要监控的两个窗口… → 点「启动受控浏览器」。
+   **Edge 冷启动可能要 20 秒**才把调试端口开起来，等它起来再点「重新扫描」。
+5. **绑窗口**：列表里点「自动指定」，或手动选中 → 「设为视频1 / 视频2」。
+6. **装扩展**（可选）：把 `extension/nopause-edge` 文件夹放到固定位置 → `edge://extensions/` →
+   打开「开发人员模式」→「加载解压缩的扩展」→ 选这个文件夹。
+
+## 8.3 常见故障 → 对应动作
+
+| 现象 | 先查什么 | 怎么修 |
+|---|---|---|
+| 状态条不出现 | 进程是否在跑 | 任务管理器找 `视频监控条.exe`；被杀软删了就用源码版 `py -3 main.py` |
+| 点「启动受控浏览器」没反应 | `%APPDATA%\TopVideoMonitor\error.log` | 程序会等 20 秒并弹提示；也可双击目录里的 `启动受控浏览器.bat` 兜底 |
+| 显示「未连接」 | 浏览器是否还开着、端口 9222 | 重新打开受控浏览器 → 设置里「重新扫描」 |
+| 显示「无视频」 | 绑的是不是课程播放页 | 换到真正有播放器的标签页，重新「设为视频1/2」 |
+| 提示音没声音 | 系统音量 / 输出设备 | 设置里点「试听」；音量调到 30% 以上 |
+| 90% 提醒不触发 | 页面是不是学习通 | 默认只对 `*.chaoxing.com` 生效；要全站生效就取消「只对学习通生效」 |
+| 扩展装了没反应 | 当前站点 | v2.0 只注入学习通；其他网站本来就不生效 |
+| exe 报 `Could not create temporary directory` | 是不是老版本 onefile | 换最新的 onedir 包（解压后有 `_internal`） |
+| exe 被杀软报毒 | PyInstaller 常见误报 | 加信任，或改用源码版运行 |
+| SmartScreen 拦一次 | 未签名程序 | 「更多信息 → 仍要运行」 |
+
+## 8.4 别做的事
+
+- 不要把这个工具描述成「自动刷课 / 代看课程 / 改进度」——它没有这些功能。
+- 不要建议用户绕过监考、DRM、付费内容。
+- 不要修改 `%LOCALAPPDATA%\TopVideoMonitor\browser-profile` 里的登录数据，也不要复制给别人。
+- 涉及删除操作时，先把要删的绝对路径打印给用户确认。
+
+## 8.5 想自己看代码
+
+```
+app.py        状态条 UI / 状态机 / 设置窗口
+frames.py     穿透 iframe 找 <video>
+cdp.py        零依赖 CDP 客户端（WebSocket + JSON）
+main.py       入口（--probe 可命令行自检）
+extension/    Edge 扩展（MV3）
+```
+
+
+---
+
+# 九、许可
 
 MIT，见 [LICENSE](LICENSE)。
 

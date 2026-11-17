@@ -7,31 +7,40 @@
   :root { color-scheme: dark; }
   body { margin: 0; min-height: 100vh; background: #14161c; color: #e8ebf2;
          font: 15px/1.75 "Microsoft YaHei UI", "Segoe UI", sans-serif; }
-  .wrap { max-width: 760px; margin: 0 auto; padding: 48px 24px 64px; }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 44px 24px 64px; }
   h1 { font-size: 24px; margin: 0 0 6px; }
-  .sub { color: #98a0b3; margin: 0 0 28px; }
-  ol { padding-left: 22px; margin: 0 0 26px; }
-  li { margin: 10px 0; }
+  .sub { color: #98a0b3; margin: 0 0 26px; }
+  ol { padding-left: 22px; margin: 0 0 18px; }
+  li { margin: 8px 0; }
   b { color: #ffd166; font-weight: 600; }
   .card { background: #1b1e26; border: 1px solid #2b3040; border-radius: 14px;
-          padding: 20px 22px; margin: 18px 0; }
+          padding: 20px 22px; margin: 16px 0; }
   .card h2 { font-size: 16px; margin: 0 0 10px; color: #2ee59d; }
   .tip { color: #98a0b3; font-size: 13px; }
   .badge { display: inline-block; font-size: 12px; background: #ff2d55; color: #fff;
            border-radius: 6px; padding: 1px 7px; margin-right: 4px; }
   .bar { font-family: Consolas, monospace; background: #1b1d23; border: 1px solid #3b4150;
          border-radius: 8px; padding: 10px 14px; margin: 10px 0; }
+  .prompt { background: #0f1116; border: 1px dashed #4a5670; border-radius: 10px;
+            padding: 12px 14px; white-space: pre-wrap; word-break: break-word;
+            font-size: 13.5px; line-height: 1.7; margin: 10px 0 8px; }
+  button { font: inherit; font-size: 13px; cursor: pointer; border-radius: 8px;
+           border: 1px solid #3b4150; background: #232838; color: #e8ebf2;
+           padding: 6px 14px; }
+  button:hover { background: #2c3346; }
+  .ai { border-color: #3a5bd9; }
+  .ai h2 { color: #7aa2ff; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>视频播放监控条</h1>
-  <p class="sub">这条状态栏会一直浮在所有窗口上面，告诉你两个窗口里的视频是否还在播放。</p>
+  <p class="sub">这条状态栏会一直浮在所有窗口上面，告诉你两个窗口里的视频是否还在播放、是不是快播完了。</p>
 
   <div class="card">
-    <h2>① 在这个浏览器里打开两个窗口</h2>
-    <p>本窗口是「受控浏览器」——只有它里面的播放状态才能被读取。
-       两个窗口各放一个视频（网课、直播、监控画面都行）。</p>
+    <h2>① 先在这个窗口里打开两个视频</h2>
+    <p>你现在看到的这个浏览器是「受控浏览器」——只有它里面的播放状态才读得到。
+       开两个窗口，各放一个视频（网课、直播、监控画面都行）。</p>
     <p class="tip">学习通、智慧树这类把播放器放在 iframe 里的网站也能识别。</p>
     <p class="tip">登录一次会被记住，下次不用重新登录。</p>
   </div>
@@ -55,7 +64,68 @@
        等视频恢复播放后自动重新武装，下次再停会重新提醒。</p>
   </div>
 
+  <div class="card">
+    <h2>④ 学习通播到 90% 时提醒</h2>
+    <div class="bar">● 视频1 播放中 08:25&nbsp;&nbsp;│&nbsp;&nbsp;<span style="color:#ffb020">⏩ 视频2 92% · 09:44</span></div>
+    <p>学习通的视频快看完（默认 <b>90%</b>）时，状态条会变成上面这样并叫一声，提醒你可以切下一节了。
+       点「我知道了」这次就不再响，文字变琥珀色。</p>
+    <p class="tip">百分比在设置里能改（1~99）。默认只对学习通生效，智慧树、B 站这些不会触发；
+       想让所有网站都提醒，把设置里「只对学习通生效」的勾去掉。</p>
+  </div>
+
+  <div class="card ai">
+    <h2>⑤ 不会弄？把这句话发给你在用的 AI 助手</h2>
+    <p>下面这段话可以整段复制，发给 DeepSeek / 豆包 / 通义 / ChatGPT 都行，让 AI 一步步教你或直接帮你操作。</p>
+    <div class="prompt" id="promptHelp">我在 Windows 上用「网课解决方案」这个工具（置顶视频播放监控条 + 学习通用的「不暂停」扩展）。
+现在遇到问题：[把你的问题写在这里，比如"状态条显示未连接" / "扩展不知道怎么装" / "提示音没有声音"]。
+请一步一步教我怎么解决，命令用 PowerShell，路径用 Windows 格式；不确定的地方先问我，不要让我执行看不懂的命令。</div>
+    <button onclick="copyText('promptHelp', this)">复制这段话</button>
+  </div>
+
+  <div class="card ai">
+    <h2>⑥ 想卸载 / 换电脑？也交给 AI</h2>
+    <p>不用记目录、不用动注册表，把下面这句发给 AI 助手，它会帮你清干净：</p>
+    <div class="prompt" id="promptUninstall">帮我彻底卸载 Windows 上的「网课解决方案」这个工具，它包含一个「视频监控条」程序和一个 Edge 扩展。
+请帮我做这几件事，做完逐条告诉我结果：
+1. 关掉正在运行的「视频监控条」（可以在任务管理器里结束进程）；
+2. 删掉程序所在文件夹（如果你不确定在哪，先搜索「视频监控条.exe」）；
+3. 删掉这两个数据目录：%APPDATA%\TopVideoMonitor 和 %LOCALAPPDATA%\TopVideoMonitor；
+4. 在 Edge 里打开 edge://extensions/，移除「不暂停 · 学习通专用」这个扩展，再删掉它的文件夹；
+5. 检查开机自启（HKCU\Software\Microsoft\Windows\CurrentVersion\Run）里有没有 TopVideoMonitor，有就删掉；
+6. 最后告诉我还有没有残留，以及怎么确认已经清干净。</div>
+    <button onclick="copyText('promptUninstall', this)">复制这段话</button>
+    <p class="tip">想自己动手的话：右键状态条 → 退出，然后删掉程序文件夹和上面那两个目录就够了。</p>
+  </div>
+
   <p class="tip">拖动条身可以换位置（拖动时不会闪）。右键菜单里还有：提示音开关 / 始终置顶 / 试听 / 退出。</p>
 </div>
+
+<script>
+function copyText(id, btn) {
+  const el = document.getElementById(id);
+  const text = el.innerText;
+  const original = btn.textContent;
+  function ok() {
+    btn.textContent = '已复制 ✓';
+    setTimeout(function () { btn.textContent = original; }, 1600);
+  }
+  function fallback() {
+    try {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      if (document.execCommand('copy')) { ok(); return; }
+    } catch (e) {}
+    btn.textContent = '请手动全选复制（Ctrl+A、Ctrl+C）';
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(ok).catch(fallback);
+  } else {
+    fallback();
+  }
+}
+</script>
 </body>
 </html>
