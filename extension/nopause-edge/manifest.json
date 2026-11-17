@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "不暂停 · 移开鼠标照样播",
-  "version": "1.0.0",
-  "description": "一键干掉「鼠标移开 / 窗口失焦就暂停视频」的事件，万一还是被暂停会立刻自动续播。",
+  "name": "不暂停 · 学习通专用",
+  "version": "2.0.0",
+  "description": "学习通（chaoxing.com）专用：干掉「鼠标移开 / 窗口失焦就暂停视频」，万一还是被暂停会立刻续播。",
   "minimum_chrome_version": "111",
   "permissions": ["storage"],
-  "host_permissions": ["<all_urls>"],
+  "host_permissions": ["*://*.chaoxing.com/*"],
   "background": {
     "service_worker": "src/background.js"
   },
@@ -27,7 +27,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": ["*://*.chaoxing.com/*"],
       "js": ["src/guard.js"],
       "run_at": "document_start",
       "all_frames": true,
@@ -35,7 +35,7 @@
       "world": "MAIN"
     },
     {
-      "matches": ["<all_urls>"],
+      "matches": ["*://*.chaoxing.com/*"],
       "js": ["src/bridge.js"],
       "run_at": "document_start",
       "all_frames": true,
@@ -46,7 +46,7 @@
   "commands": {
     "toggle-site": {
       "suggested_key": { "default": "Alt+Shift+X" },
-      "description": "在当前网站开启 / 关闭「不暂停」"
+      "description": "学习通（chaoxing.com）专用：干掉「鼠标移开 / 窗口失焦就暂停视频」，万一还是被暂停会立刻续播。"
     }
   }
 }

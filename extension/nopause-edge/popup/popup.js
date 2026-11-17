@@ -57,7 +57,7 @@ function paintMaster(on) {
     return;
   }
   el.title.textContent = on ? '已开启 · 本站不暂停' : '已关闭 · 本站照常暂停';
-  el.hint.textContent = on ? '移开鼠标、切窗口都不会停' : '仅影响当前网站，其他网站不受影响';
+  el.hint.textContent = on ? '移开鼠标、切窗口都不会停' : '仅影响学习通，其他网站不受影响';
 }
 
 function paintStats(state) {

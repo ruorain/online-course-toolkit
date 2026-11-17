@@ -23,6 +23,7 @@ import threading
 import time
 import tkinter as tk
 import traceback
+import urllib.parse
 import winsound
 from tkinter import messagebox, ttk
 
@@ -178,6 +179,9 @@ DEFAULT_CONFIG = {
     "profile_dir": "",
     "threshold_sec": 5,      # 停止多少秒后开始闪烁报警
     "sound": True,
+    "progress_alert": True,  # 播放到指定百分比时也提醒（网课刷课用）
+    "progress_percent": 90,  # 提醒百分比，1~99
+    "progress_only_chaoxing": True,  # 进度提醒只对学习通（*.chaoxing.com）生效
     "beep_interval": 8,      # 提示音重复间隔（秒）
     "flash_ms": 450,         # 闪烁半周期（毫秒）
     "font_px": 15,           # 字号（96dpi 下的像素）
@@ -235,6 +239,11 @@ class Channel:
         self.bad_since = None
         self._last_t = {}
         self._changed_at = time.monotonic()
+        # 进度提醒（播到 N% 时叫一声，学习通刷课用）
+        self.progress_hit = False
+        self._prog_enabled = False
+        self._prog_percent = 90.0
+        self._prog_only_chaoxing = True
 
     # -- 绑定 ------------------------------------------------------------- #
     @property
@@ -362,12 +371,53 @@ class Channel:
             self.duration = v.get("d") or 0.0
             self.muted = bool(v.get("m"))
             self._set_state(STATE_PLAYING, now, "")
+            self._update_progress()
         elif stalled:
             self._set_state(STATE_BUFFERING, now, "时间不走（缓冲/卡住）")
         elif ended:
             self._set_state(STATE_STOPPED, now, "播放结束")
         else:
             self._set_state(STATE_STOPPED, now, "已暂停")
+
+    def set_progress_alert(self, enabled: bool, percent: float, only_chaoxing: bool = True):
+        """由监控线程每轮同步配置。"""
+        self._prog_enabled = bool(enabled)
+        self._prog_only_chaoxing = bool(only_chaoxing)
+        try:
+            self._prog_percent = max(1.0, min(99.0, float(percent)))
+        except Exception:
+            self._prog_percent = 90.0
+        if not self._prog_enabled:
+            self.progress_hit = False
+
+    def _is_chaoxing(self) -> bool:
+        """当前页面是不是学习通（*.chaoxing.com）。"""
+        try:
+            host = (urllib.parse.urlparse(self.page_url or "").hostname or "").lower()
+        except Exception:
+            return False
+        return host == "chaoxing.com" or host.endswith(".chaoxing.com")
+
+    def _update_progress(self):
+        if not self._prog_enabled or self.duration <= 0:
+            self.progress_hit = False
+            return
+        if self._prog_only_chaoxing and not self._is_chaoxing():
+            # 只认学习通，其他站点不做进度提醒
+            self.progress_hit = False
+            return
+        pct = self.play_time / self.duration * 100.0
+        if pct >= self._prog_percent:
+            self.progress_hit = True
+        elif pct < self._prog_percent * 0.5:
+            # 从头/从很早的位置重新播了，重新武装
+            self.progress_hit = False
+
+    @property
+    def progress_pct(self) -> float:
+        if self.duration <= 0:
+            return 0.0
+        return max(0.0, min(100.0, self.play_time / self.duration * 100.0))
 
     def snapshot(self) -> dict:
         return {
@@ -382,6 +432,9 @@ class Channel:
             "url": self.page_url,
             "bound": self.bound,
             "target_id": self.target_id,
+            "progress_hit": self.progress_hit,
+            "progress_percent": self._prog_percent,
+            "progress_pct": self.progress_pct,
         }
 
 
@@ -480,6 +533,11 @@ class Monitor(threading.Thread):
         used = set()
         for ch in self.channels:
             ch.resolve(pages, used)
+            ch.set_progress_alert(
+                bool(self.cfg.get("progress_alert", True)),
+                float(self.cfg.get("progress_percent", 90) or 90),
+                bool(self.cfg.get("progress_only_chaoxing", True)),
+            )
 
         for ch in self.channels:
             if not ch.bound:
@@ -863,20 +921,22 @@ class App:
         sizes_changed = False
         for i, ch in enumerate(snap["channels"][:2]):
             lbl = self.labels[i]
-            bad = ch["state"] in BAD_STATES and ch["bad_sec"] >= threshold
+            prog = bool(ch.get("progress_hit")) and ch["state"] == STATE_PLAYING
+            bad = (ch["state"] in BAD_STATES and ch["bad_sec"] >= threshold) or prog
             if not bad:
                 self._acked.discard(i)      # 恢复了：重新武装
             acked = i in self._acked
             if bad and not acked:
                 alert_idx.add(i)
-            text = self._chan_text(ch, bad, threshold, acked)
+            text = self._chan_text(ch, bad, threshold, acked, prog)
             if lbl.cget("text") != text:
                 lbl.configure(text=text)
                 sizes_changed = True
             if bad and acked:
-                # 已经点过「我知道了」：静态暗红，不闪不响
-                if lbl.cget("bg") != "#4a1a20" or lbl.cget("fg") != "#ff9b9b":
-                    lbl.configure(bg="#4a1a20", fg="#ff9b9b")
+                # 已经点过「我知道了」：静态不闪，进度提醒用琥珀色区分
+                want_bg, want_fg = ("#3a2a12", "#ffcb6b") if prog else ("#4a1a20", "#ff9b9b")
+                if lbl.cget("bg") != want_bg or lbl.cget("fg") != want_fg:
+                    lbl.configure(bg=want_bg, fg=want_fg)
             elif not bad:
                 color = {
                     STATE_PLAYING: C_PLAY,
@@ -932,9 +992,15 @@ class App:
         if self.last_snap:
             self._render(self.last_snap)
 
-    def _chan_text(self, ch, bad, threshold, acked=False):
+    def _chan_text(self, ch, bad, threshold, acked=False, prog=False):
         label = ch["label"] or "视频"
         st = ch["state"]
+        if prog and st == STATE_PLAYING:
+            base = "⏩ %s %.0f%% · %s" % (label, ch.get("progress_pct") or 0,
+                                          fmt_time(ch["play_time"]))
+            if acked:
+                base += " · 已静音"
+            return base
         if st == STATE_PLAYING:
             extra = " " + fmt_time(ch["play_time"])
         elif st == STATE_STOPPED:
@@ -1278,6 +1344,10 @@ class SettingsWindow:
         self.v_sound = tk.BooleanVar(value=bool(self.cfg.get("sound", True)))
         self.v_opacity = tk.DoubleVar(value=float(self.cfg.get("opacity", 1.0)))
         self.v_auto = tk.BooleanVar(value=self._autostart_enabled())
+        self.v_progress = tk.BooleanVar(value=bool(self.cfg.get("progress_alert", True)))
+        self.v_progress_pct = tk.IntVar(value=int(self.cfg.get("progress_percent", 90)))
+        self.v_progress_chaoxing = tk.BooleanVar(
+            value=bool(self.cfg.get("progress_only_chaoxing", True)))
 
         def num(parent, label, var, lo, hi, r, c, step=1, w=5, unit=""):
             tk.Label(parent, text=label, font=self._font, bg="#f4f5f7").grid(
@@ -1309,6 +1379,18 @@ class SettingsWindow:
         tk.Button(g, text="试听提示音", font=self._font,
                   command=self.app.alerter.preview).grid(row=1, column=5, columnspan=2,
                                                          sticky="w")
+        # 第 4 行：进度提醒（学习通刷课：播到 N% 就叫一声）
+        tk.Checkbutton(g, text="播放到", variable=self.v_progress, font=self._font,
+                       bg="#f4f5f7", activebackground="#f4f5f7").grid(
+            row=3, column=0, sticky="w", pady=(4, 2))
+        tk.Spinbox(g, from_=1, to=99, increment=5, width=4, textvariable=self.v_progress_pct,
+                   font=self._font, justify="center").grid(
+            row=3, column=1, sticky="w", padx=(2, 2), pady=(4, 2))
+        tk.Label(g, text="% 时提醒", font=self._font, bg="#f4f5f7").grid(
+            row=3, column=2, sticky="w", pady=(4, 2))
+        tk.Checkbutton(g, text="只对学习通生效", variable=self.v_progress_chaoxing,
+                       font=self._font, bg="#f4f5f7", activebackground="#f4f5f7").grid(
+            row=3, column=3, columnspan=3, sticky="w", pady=(4, 2))
 
         self.lbl_state = tk.Label(wrap, text="", font=("Microsoft YaHei UI", -int(9 * s)),
                                   bg="#f4f5f7", fg="#666", anchor="w", justify="left")
@@ -1584,6 +1666,9 @@ class SettingsWindow:
             self.cfg["font_px"] = max(9, min(40, int(self.v_font.get())))
             self.cfg["sound"] = bool(self.v_sound.get())
             self.cfg["opacity"] = round(float(self.v_opacity.get()), 2)
+            self.cfg["progress_alert"] = bool(self.v_progress.get())
+            self.cfg["progress_percent"] = max(1, min(99, int(self.v_progress_pct.get())))
+            self.cfg["progress_only_chaoxing"] = bool(self.v_progress_chaoxing.get())
             auto = bool(self.v_auto.get())
             self.cfg["autostart"] = auto
             self._set_autostart(auto)
