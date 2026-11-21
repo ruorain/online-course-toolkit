@@ -18,9 +18,10 @@ PROBE_JS = r"""
     var out = [];
     var vs = document.querySelectorAll('video');
     for (var i = 0; i < vs.length; i++) {
-      var v = vs[i], t = 0, d = 0;
+      var v = vs[i], t = 0, d = 0, s = '';
       try { t = v.currentTime || 0; } catch (e) {}
       try { d = v.duration; } catch (e) {}
+      try { s = String(v.currentSrc || v.src || '').split('?')[0].slice(0, 300); } catch (e) {}
       out.push({
         w: v.videoWidth | 0,
         h: v.videoHeight | 0,
@@ -29,7 +30,8 @@ PROBE_JS = r"""
         rs: v.readyState | 0,
         t: t,
         d: (typeof d === 'number' && isFinite(d)) ? d : 0,
-        m: v.muted ? 1 : 0
+        m: v.muted ? 1 : 0,
+        s: s
       });
     }
     return {

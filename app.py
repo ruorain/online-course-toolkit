@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import ctypes
 import json
+import math
 import os
 import queue
 import re
@@ -122,6 +123,14 @@ def fmt_time(sec: float) -> str:
     return "%d:%02d:%02d" % (h, m, s) if h else "%02d:%02d" % (m, s)
 
 
+def fmt_hms(sec: float) -> str:
+    """固定宽度的 H:MM:SS，避免状态条随小时位变化而抖动。"""
+    sec = int(max(0.0, sec or 0))
+    h, rem = divmod(sec, 3600)
+    m, s = divmod(rem, 60)
+    return "%02d:%02d:%02d" % (h, m, s)
+
+
 def atomic_write_json(path: str, data) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp = path + ".tmp"
@@ -179,6 +188,7 @@ DEFAULT_CONFIG = {
     "profile_dir": "",
     "threshold_sec": 5,      # 停止多少秒后开始闪烁报警
     "sound": True,
+    "show_watched": True,    # 状态条是否显示每路的「已刷时长」
     "progress_alert": True,  # 播放到指定百分比时也提醒（网课刷课用）
     "progress_percent": 90,  # 提醒百分比，1~99
     "progress_only_chaoxing": True,  # 进度提醒只对学习通（*.chaoxing.com）生效
@@ -239,8 +249,13 @@ class Channel:
         self.bad_since = None
         self._last_t = {}
         self._changed_at = time.monotonic()
+        # 本次启动以来的累计播放时长（视频秒数，不是墙钟；重启归零）
+        self.watched_sec = 0.0
+        self._last_update_at = time.monotonic()
         # 进度提醒（播到 N% 时叫一声，学习通刷课用）
         self.progress_hit = False
+        self._prev_pct = None
+        self._last_src = ""
         self._prog_enabled = False
         self._prog_percent = 90.0
         self._prog_only_chaoxing = True
@@ -257,6 +272,10 @@ class Channel:
         self._last_t = {}
         self.bad_since = None
         self.state_since = time.monotonic()
+        # 换页/重新绑定后，旧视频的“已到 90%”不能带到新视频上
+        self.progress_hit = False
+        self._prev_pct = None
+        self._last_src = ""
 
     def resolve(self, pages: list, used: set) -> None:
         """把配置里的 url/标题 提示解析成本次运行的 target id。"""
@@ -320,6 +339,8 @@ class Channel:
         self._set_state(STATE_OFFLINE, now, note)
 
     def update(self, res, now: float):
+        dt = max(0.0, now - self._last_update_at)
+        self._last_update_at = now
         if not isinstance(res, dict) or not res.get("ok"):
             self.mark_offline(now, "页面无法读取")
             return
@@ -366,13 +387,36 @@ class Channel:
                 stalled.append((i, v))
 
         if playing:
-            i, v = playing[0]
+            # 一个页面可能同时有正片、预览、广告多个 <video>；
+            # 取画面最大的那个，别让一个小广告的进度冒充课程进度。
+            i, v = max(playing, key=lambda iv: (
+                (iv[1].get("w") or 0) * (iv[1].get("h") or 0),
+                iv[1].get("d") or 0.0))
+            new_d = v.get("d") or 0.0
+            src = (v.get("s") or "").strip()
+            # 学习通换章节时页面 target 不变，但视频源/时长会变；
+            # 不重置的话，新章节一上来 95% 会直接闪+响，看起来像百分比出错。
+            if src and self._last_src and src != self._last_src:
+                self.progress_hit = False
+                self._prev_pct = None
+            elif self.duration > 0 and new_d > 0 and abs(new_d - self.duration) > 2.0:
+                self.progress_hit = False
+                self._prev_pct = None
+            if src:
+                self._last_src = src
             self.play_time = v.get("t") or 0.0
-            self.duration = v.get("d") or 0.0
+            self.duration = new_d
             self.muted = bool(v.get("m"))
+            self._add_watched(prev_map.get(i), v, dt)
             self._set_state(STATE_PLAYING, now, "")
             self._update_progress()
         elif stalled:
+            i, v = max(stalled, key=lambda iv: (
+                (iv[1].get("w") or 0) * (iv[1].get("h") or 0),
+                iv[1].get("d") or 0.0))
+            # 采样间隔偶尔 >3s 时会被判成“卡住”，但 currentTime 确实在走：
+            # 计时不能跟着停，否则“已刷”会少算。
+            self._add_watched(prev_map.get(i), v, dt)
             self._set_state(STATE_BUFFERING, now, "时间不走（缓冲/卡住）")
         elif ended:
             self._set_state(STATE_STOPPED, now, "播放结束")
@@ -399,25 +443,53 @@ class Channel:
         return host == "chaoxing.com" or host.endswith(".chaoxing.com")
 
     def _update_progress(self):
-        if not self._prog_enabled or self.duration <= 0:
+        if (not self._prog_enabled or self.duration <= 0
+                or not math.isfinite(self.duration)):
             self.progress_hit = False
+            self._prev_pct = None
             return
         if self._prog_only_chaoxing and not self._is_chaoxing():
             # 只认学习通，其他站点不做进度提醒
             self.progress_hit = False
+            self._prev_pct = None
             return
         pct = self.play_time / self.duration * 100.0
-        if pct >= self._prog_percent:
-            self.progress_hit = True
-        elif pct < self._prog_percent * 0.5:
-            # 从头/从很早的位置重新播了，重新武装
+        if not math.isfinite(pct):
             self.progress_hit = False
+            self._prev_pct = None
+            return
+        # 关键：只有“从阈值下方正常走到阈值上方”才重新武装。
+        # 这样重播/拖回 50% 不会还挂着 90% 的提醒（之前会在 50% 就闪+响）。
+        below = max(0.0, self._prog_percent - 1.0)
+        if pct < below:
+            self.progress_hit = False
+        elif pct >= self._prog_percent and not self.progress_hit:
+            if self._prev_pct is not None and self._prev_pct < self._prog_percent:
+                self.progress_hit = True
+        self._prev_pct = pct
 
     @property
     def progress_pct(self) -> float:
-        if self.duration <= 0:
+        if self.duration <= 0 or not math.isfinite(self.duration):
+            return 0.0
+        if not math.isfinite(self.play_time):
             return 0.0
         return max(0.0, min(100.0, self.play_time / self.duration * 100.0))
+
+    def _add_watched(self, prev_t, v, dt: float):
+        """累计“真实向前播放”的视频秒数。
+
+        - 只认 currentTime 的净增量，暂停/缓冲时增量为 0，自然不计；
+        - 按本轮实际耗时封顶，拖动进度条/跳转不会被算成“刷了”；
+        - 2x 倍速时 currentTime 走两倍，仍然按课程时长计入（“已刷”语义）。
+        """
+        if prev_t is None:
+            return
+        delta = (v.get("t") or 0.0) - prev_t
+        if delta <= 0:
+            return
+        cap = min(10.0, max(1.0, dt * 6.0))
+        self.watched_sec += min(delta, cap)
 
     def snapshot(self) -> dict:
         return {
@@ -435,6 +507,7 @@ class Channel:
             "progress_hit": self.progress_hit,
             "progress_percent": self._prog_percent,
             "progress_pct": self.progress_pct,
+            "watched_sec": self.watched_sec,
         }
 
 
@@ -724,6 +797,9 @@ class App:
             self._bind_drag(lbl)
             self.labels.append(lbl)
 
+        # 每路已刷时长（分开算；重启归零）
+        self._show_watched = bool(self.cfg.get("show_watched", True))
+
         # 「我知道了」：报警时出现，点一下停止闪烁和响铃（文字保留，恢复播放后自动重新武装）
         self._ack_btn_shown = False
         self._acked = set()
@@ -772,6 +848,9 @@ class App:
         self._top_var = tk.BooleanVar(value=bool(self.cfg.get("topmost", True)))
         self._menu.add_checkbutton(label="始终置顶", variable=self._top_var,
                                    command=self._toggle_topmost)
+        self._watched_var = tk.BooleanVar(value=self._show_watched)
+        self._menu.add_checkbutton(label="显示每路已刷时长", variable=self._watched_var,
+                                   command=self._toggle_watched)
         self._menu.add_command(label="试听提示音", command=self.alerter.preview)
         self._menu.add_separator()
         self._menu.add_command(label="打开受控浏览器", command=self.launch_browser)
@@ -996,29 +1075,40 @@ class App:
         label = ch["label"] or "视频"
         st = ch["state"]
         if prog and st == STATE_PLAYING:
-            base = "⏩ %s %.0f%% · %s" % (label, ch.get("progress_pct") or 0,
-                                          fmt_time(ch["play_time"]))
+            pct = ch.get("progress_pct") or 0.0
+            try:
+                pct = float(pct)
+            except Exception:
+                pct = 0.0
+            if not math.isfinite(pct):
+                pct = 0.0
+            # 播放中最多显示 99%：100% 留给“播放结束”，避免看起来像数据错误
+            pct = max(0, min(99, int(round(pct))))
+            base = "⏩ %s %d%% · %s" % (label, pct, fmt_time(ch["play_time"]))
             if acked:
                 base += " · 已静音"
-            return base
-        if st == STATE_PLAYING:
-            extra = " " + fmt_time(ch["play_time"])
-        elif st == STATE_STOPPED:
-            if bad:
-                extra = " %.0fs" % ch["bad_sec"]
-            elif "结束" in (ch["note"] or ""):
-                extra = "（播放结束）"
+        else:
+            if st == STATE_PLAYING:
+                extra = " " + fmt_time(ch["play_time"])
+            elif st == STATE_STOPPED:
+                if bad:
+                    extra = " %.0fs" % ch["bad_sec"]
+                elif "结束" in (ch["note"] or ""):
+                    extra = "（播放结束）"
+                else:
+                    extra = ""
+            elif st == STATE_BUFFERING:
+                extra = " %.0fs" % ch["bad_sec"] if bad else ""
             else:
                 extra = ""
-        elif st == STATE_BUFFERING:
-            extra = " %.0fs" % ch["bad_sec"] if bad else ""
-        else:
-            extra = ""
-        base = "%s %s %s%s" % (ICON.get(st, "•"), label, TEXT.get(st, st), extra)
-        if st == STATE_UNBOUND:
-            base = "… %s 未指定" % label
-        if acked and bad:
-            base += " · 已静音"
+            base = "%s %s %s%s" % (ICON.get(st, "•"), label, TEXT.get(st, st), extra)
+            if st == STATE_UNBOUND:
+                base = "… %s 未指定" % label
+            if acked and bad:
+                base += " · 已静音"
+        watched = float(ch.get("watched_sec") or 0.0)
+        if self._show_watched and (st != STATE_UNBOUND or watched > 0):
+            base += " · 已刷 " + fmt_hms(watched)
         return base
 
     def _flash_tick(self):
@@ -1055,6 +1145,15 @@ class App:
         self.cfg["topmost"] = bool(self._top_var.get())
         self.root.attributes("-topmost", bool(self.cfg["topmost"]))
         self.save_config()
+
+    def _toggle_watched(self):
+        """右键菜单：显示/隐藏每路的「已刷」时长。"""
+        self._show_watched = bool(self._watched_var.get())
+        self.cfg["show_watched"] = self._show_watched
+        self.save_config()
+        if self.last_snap:
+            self._render(self.last_snap)
+        self._apply_geometry()
 
     def apply_settings(self):
         for w in self.labels + [self.ack_btn, self.set_btn, self.close_btn]:
@@ -1641,11 +1740,12 @@ class SettingsWindow:
         snap = self.app.monitor.snapshot()
         parts = []
         for ch in snap["channels"]:
-            parts.append("%s：%s%s" % (
+            parts.append("%s：%s%s · 已刷 %s" % (
                 ch["label"],
                 {"playing": "播放中", "stopped": "已停止", "buffering": "卡住了",
                  "novideo": "无视频", "offline": "未连接", "unbound": "未指定"}.get(ch["state"], ch["state"]),
                 ("（%.1fs）" % ch["bad_sec"]) if ch["bad_sec"] > 0 else "",
+                fmt_time(ch.get("watched_sec") or 0.0),
             ))
         self.lbl_state.configure(text="实时状态：" + "    ".join(parts))
 
